@@ -1,0 +1,7 @@
+super_admin = platform owner
+hotel_admin = full access for one hotel
+hr_manager = HR operations
+payroll_officer = payroll only
+manager = department access
+employee = self service
+auditor = read-only
