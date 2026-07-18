@@ -1,4 +1,5 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Employee } from './employee.entity';
 
 @Entity('employment_assignments')
 export class EmploymentAssignment {
@@ -28,6 +29,10 @@ export class EmploymentAssignment {
 
   @Column({ type: 'text', nullable: true })
   transferReason?: string;
+
+  @ManyToOne(() => Employee, (emp) => emp.assignments, { nullable: false })
+  @JoinColumn({ name: 'employeeId' })
+  employee: Employee;
 
   @CreateDateColumn()
   createdAt: Date;

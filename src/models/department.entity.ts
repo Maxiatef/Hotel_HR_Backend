@@ -1,4 +1,6 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import { Hotel } from './hotel.entity';
+import { Employee } from './employee.entity';
 
 @Entity('departments')
 export class Department {
@@ -13,6 +15,13 @@ export class Department {
 
   @Column({ type: 'boolean', default: true })
   isActive: boolean;
+
+  @ManyToOne(() => Hotel, (hotel) => hotel.departments, { nullable: false })
+  @JoinColumn({ name: 'hotelId' })
+  hotel: Hotel;
+
+  @OneToMany(() => Employee, (emp) => emp.department)
+  employees: Employee[];
 
   @CreateDateColumn()
   createdAt: Date;

@@ -1,4 +1,5 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, OneToMany } from 'typeorm';
+import { PayrollRun } from './payroll-run.entity';
 
 @Entity('payroll_periods')
 export class PayrollPeriod {
@@ -16,6 +17,9 @@ export class PayrollPeriod {
 
   @Column({ type: 'varchar', default: 'open' })
   status: string;
+
+  @OneToMany(() => PayrollRun, (pr) => pr.payrollPeriod)
+  payrollRuns: PayrollRun[];
 
   @CreateDateColumn()
   createdAt: Date;

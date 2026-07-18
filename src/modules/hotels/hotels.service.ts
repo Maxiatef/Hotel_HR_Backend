@@ -17,8 +17,15 @@ export class HotelService {
     return this.repo.save(entity);
   }
 
-  findAll() {
-    return this.repo.find({ where: {} });
+  async findAll(page = 1, limit = 25, sortBy?: string, sortOrder: 'ASC' | 'DESC' = 'ASC') {
+    const skip = (page - 1) * limit;
+    const order = sortBy ? { [sortBy]: sortOrder } : {};
+    const [data, total] = await this.repo.findAndCount({
+      skip,
+      take: limit,
+      order,
+    });
+    return { data, total, page, limit };
   }
 
   async findOne(id: string) {

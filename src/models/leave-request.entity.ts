@@ -1,4 +1,5 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Employee } from './employee.entity';
 
 @Entity('leave_requests')
 export class LeaveRequest {
@@ -25,6 +26,10 @@ export class LeaveRequest {
 
   @Column({ type: 'text', nullable: true })
   reason?: string;
+
+  @ManyToOne(() => Employee, (emp) => emp.leaveRequests, { nullable: false })
+  @JoinColumn({ name: 'employeeId' })
+  employee: Employee;
 
   @CreateDateColumn()
   createdAt: Date;

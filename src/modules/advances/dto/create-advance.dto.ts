@@ -1,11 +1,29 @@
-/**
- * Generic DTO — accepts the entity's writable fields as `any`.
- * See src/modules/employees/dto/create-employee.dto.ts for the fully-typed,
- * class-validator version; apply that same pattern here when you're ready.
- */
+import { IsString, IsNotEmpty, IsNumber, IsDateString, IsOptional, IsIn } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
 export class CreateAdvanceDto {
-  employeeId?: any;
-  amount?: any;
-  requestDate?: any;
-  status?: any;
+  @ApiProperty({ example: 'uuid-employee-id' })
+  @IsString()
+  @IsNotEmpty()
+  employeeId: string;
+
+  @ApiProperty({ example: 'uuid-hotel-id' })
+  @IsString()
+  @IsNotEmpty()
+  hotelId: string;
+
+  @ApiProperty({ example: 1000, description: 'Advance amount requested' })
+  @IsNumber()
+  @IsNotEmpty()
+  amount: number;
+
+  @ApiProperty({ example: '2024-01-10', description: 'Request date (ISO 8601)' })
+  @IsDateString()
+  @IsNotEmpty()
+  requestDate: string;
+
+  @ApiPropertyOptional({ example: 'pending', enum: ['pending', 'approved', 'rejected', 'deducted'] })
+  @IsOptional()
+  @IsIn(['pending', 'approved', 'rejected', 'deducted'])
+  status?: string;
 }

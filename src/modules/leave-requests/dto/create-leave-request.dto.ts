@@ -1,13 +1,39 @@
-/**
- * Generic DTO — accepts the entity's writable fields as `any`.
- * See src/modules/employees/dto/create-employee.dto.ts for the fully-typed,
- * class-validator version; apply that same pattern here when you're ready.
- */
+import { IsString, IsNotEmpty, IsOptional, IsDateString, IsIn } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
 export class CreateLeaveRequestDto {
-  employeeId?: any;
-  leaveType?: any;
-  startDate?: any;
-  endDate?: any;
-  status?: any;
-  reason?: any;
+  @ApiPropertyOptional({ example: 'uuid-employee-id' })
+  @IsOptional()
+  @IsString()
+  employeeId?: string;
+
+  @ApiPropertyOptional({ example: 'uuid-hotel-id' })
+  @IsOptional()
+  @IsString()
+  hotelId?: string;
+
+  @ApiProperty({ example: 'annual', enum: ['annual', 'sick', 'personal', 'maternity', 'paternity', 'unpaid'] })
+  @IsString()
+  @IsNotEmpty()
+  leaveType: string;
+
+  @ApiProperty({ example: '2024-02-01', description: 'Leave start date (ISO 8601)' })
+  @IsDateString()
+  @IsNotEmpty()
+  startDate: string;
+
+  @ApiProperty({ example: '2024-02-07', description: 'Leave end date (ISO 8601)' })
+  @IsDateString()
+  @IsNotEmpty()
+  endDate: string;
+
+  @ApiPropertyOptional({ example: 'pending', enum: ['pending', 'approved', 'rejected'] })
+  @IsOptional()
+  @IsIn(['pending', 'approved', 'rejected'])
+  status?: string;
+
+  @ApiPropertyOptional({ example: 'Family vacation' })
+  @IsOptional()
+  @IsString()
+  reason?: string;
 }

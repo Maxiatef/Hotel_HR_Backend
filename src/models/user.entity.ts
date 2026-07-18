@@ -1,4 +1,5 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Hotel } from './hotel.entity';
 
 @Entity('users')
 export class User {
@@ -28,6 +29,10 @@ export class User {
 
   @Column({ type: 'timestamp', nullable: true })
   lastLoginAt?: Date;
+
+  @ManyToOne(() => Hotel, (hotel) => hotel.users, { nullable: false })
+  @JoinColumn({ name: 'hotelId' })
+  hotel: Hotel;
 
   @CreateDateColumn()
   createdAt: Date;

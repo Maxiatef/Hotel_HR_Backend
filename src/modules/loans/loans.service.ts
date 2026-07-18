@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Loan } from '../../models/loan.entity';
@@ -13,12 +13,30 @@ export class LoanService {
   ) {}
 
   create(hotelId: string, dto: CreateLoanDto) {
-    const entity = this.repo.create({ ...(dto as any), hotelId });
+    if (dto.remainingAmount !== dto.principalAmount) {
+      throw new BadRequestException('remainingAmount must equal principalAmount on creation');
+    }
+
+    const monthlyInstallment = dto.monthlyInstallment ?? dto.principalAmount / 12;
+
+    const entity = this.repo.create({
+      ...(dto as any),
+      hotelId,
+      monthlyInstallment,
+    });
     return this.repo.save(entity);
   }
 
-  findAll(hotelId: string) {
-    return this.repo.find({ where: { hotelId } as any });
+  async findAll(hotelId: string, page = 1, limit = 25, sortBy?: string, sortOrder: 'ASC' | 'DESC' = 'ASC') {
+    const skip = (page - 1) * limit;
+    const order = sortBy ? { [sortBy]: sortOrder } : {};
+    const [data, total] = await this.repo.findAndCount({
+      where: { hotelId } as any,
+      skip,
+      take: limit,
+      order,
+    });
+    return { data, total, page, limit };
   }
 
   async findOne(id: string, hotelId: string) {

@@ -1,4 +1,5 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { PayrollRun } from './payroll-run.entity';
 
 @Entity('payroll_items')
 export class PayrollItem {
@@ -36,13 +37,26 @@ export class PayrollItem {
   loanDeductionTotal: number;
 
   @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
+  advanceDeductionTotal: number;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
   socialInsuranceTotal: number;
 
   @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
   taxTotal: number;
 
+  @Column({ type: 'decimal', precision: 8, scale: 2, default: 0 })
+  totalHoursWorked: number;
+
+  @Column({ type: 'decimal', precision: 8, scale: 2, default: 0 })
+  totalOvertimeHours: number;
+
   @Column({ type: 'decimal', precision: 12, scale: 2 })
   netSalary: number;
+
+  @ManyToOne(() => PayrollRun, (pr) => pr.items, { nullable: false })
+  @JoinColumn({ name: 'payrollRunId' })
+  payrollRun: PayrollRun;
 
   @CreateDateColumn()
   createdAt: Date;

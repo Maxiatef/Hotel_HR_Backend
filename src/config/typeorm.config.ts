@@ -5,10 +5,16 @@ config();
 
 export const typeOrmConfig: DataSourceOptions = {
   type: 'postgres',
-  url: process.env.DATABASE_URL,
+  host: process.env.POSTGRESQL_ADDON_HOST,
+  port: parseInt(process.env.POSTGRESQL_ADDON_PORT ?? '5432', 10),
+  username: process.env.POSTGRESQL_ADDON_USER,
+  password: process.env.POSTGRESQL_ADDON_PASSWORD,
+  database: process.env.POSTGRESQL_ADDON_DB,
+  schema: 'public',
+  ssl: { rejectUnauthorized: false },
   entities: [__dirname + '/../models/*.entity{.ts,.js}'],
   migrations: [__dirname + '/../migrations/*{.ts,.js}'],
-  synchronize: process.env.NODE_ENV !== 'production', // dev convenience only — use migrations in prod
+  synchronize: false,
   logging: false,
 };
 

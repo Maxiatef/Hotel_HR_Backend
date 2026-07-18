@@ -17,8 +17,16 @@ export class BonusDeductionService {
     return this.repo.save(entity);
   }
 
-  findAll(hotelId: string) {
-    return this.repo.find({ where: { hotelId } as any });
+  async findAll(hotelId: string, page = 1, limit = 25, sortBy?: string, sortOrder: 'ASC' | 'DESC' = 'ASC') {
+    const skip = (page - 1) * limit;
+    const order = sortBy ? { [sortBy]: sortOrder } : {};
+    const [data, total] = await this.repo.findAndCount({
+      where: { hotelId } as any,
+      skip,
+      take: limit,
+      order,
+    });
+    return { data, total, page, limit };
   }
 
   async findOne(id: string, hotelId: string) {

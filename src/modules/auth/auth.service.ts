@@ -12,6 +12,7 @@ import { User } from '../../models/user.entity';
 import { Hotel } from '../../models/hotel.entity';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 @Injectable()
 export class AuthService {
@@ -48,6 +49,7 @@ export class AuthService {
       sub: user.id,
       hotelId: user.hotelId,
       role: user.role,
+      employeeId: user.employeeId,
     };
 
     return {
@@ -58,6 +60,7 @@ export class AuthService {
         email: user.email,
         role: user.role,
         hotelId: user.hotelId,
+        employeeId: user.employeeId,
       },
     };
   }
@@ -101,6 +104,7 @@ export class AuthService {
       sub: saved.id,
       hotelId: saved.hotelId,
       role: saved.role,
+      employeeId: saved.employeeId,
     };
 
     return {
@@ -111,7 +115,52 @@ export class AuthService {
         email: saved.email,
         role: saved.role,
         hotelId: saved.hotelId,
+        employeeId: saved.employeeId,
       },
     };
+  }
+
+  async seed(hotelName: string, hotelCode: string, username: string, email: string, password: string) {
+    const userCount = await this.userRepo.count();
+    if (userCount > 0) {
+      throw new BadRequestException('Seed is only allowed when no users exist');
+    }
+
+    const hotel = this.hotelRepo.create({ code: hotelCode, name: hotelName, isActive: true });
+    const savedHotel = await this.hotelRepo.save(hotel);
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const user = this.userRepo.create({
+      hotelId: savedHotel.id,
+      username,
+      email,
+      passwordHash,
+      role: 'super_admin',
+    });
+    const savedUser = await this.userRepo.save(user);
+
+    const payload = { sub: savedUser.id, hotelId: savedUser.hotelId, role: savedUser.role };
+    return {
+      accessToken: this.jwtService.sign(payload),
+      user: { id: savedUser.id, username: savedUser.username, email: savedUser.email, role: savedUser.role, hotelId: savedUser.hotelId },
+      hotel: { id: savedHotel.id, code: savedHotel.code, name: savedHotel.name },
+    };
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const passwordValid = await bcrypt.compare(dto.oldPassword, user.passwordHash);
+    if (!passwordValid) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    user.passwordHash = await bcrypt.hash(dto.newPassword, 10);
+    await this.userRepo.save(user);
+
+    return { message: 'Password changed successfully' };
   }
 }

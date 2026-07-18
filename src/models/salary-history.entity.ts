@@ -1,4 +1,5 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Employee } from './employee.entity';
 
 @Entity('salary_history')
 export class SalaryHistory {
@@ -31,6 +32,10 @@ export class SalaryHistory {
 
   @Column({ type: 'varchar', nullable: true })
   createdBy?: string;
+
+  @ManyToOne(() => Employee, (emp) => emp.salaryHistories, { nullable: false })
+  @JoinColumn({ name: 'employeeId' })
+  employee: Employee;
 
   @CreateDateColumn()
   createdAt: Date;

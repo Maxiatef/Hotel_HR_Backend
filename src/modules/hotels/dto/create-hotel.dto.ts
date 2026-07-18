@@ -1,11 +1,24 @@
-/**
- * Generic DTO — accepts the entity's writable fields as `any`.
- * See src/modules/employees/dto/create-employee.dto.ts for the fully-typed,
- * class-validator version; apply that same pattern here when you're ready.
- */
+import { IsString, IsNotEmpty, IsOptional, IsBoolean } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
 export class CreateHotelDto {
-  code?: any;
-  name?: any;
-  city?: any;
-  isActive?: any;
+  @ApiProperty({ example: 'HTL-001', description: 'Unique hotel code' })
+  @IsString()
+  @IsNotEmpty()
+  code: string;
+
+  @ApiProperty({ example: 'Grand Nile Hotel', description: 'Hotel name' })
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @ApiPropertyOptional({ example: 'Cairo', description: 'City where the hotel is located' })
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  @ApiPropertyOptional({ example: true, description: 'Whether the hotel is active' })
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 }

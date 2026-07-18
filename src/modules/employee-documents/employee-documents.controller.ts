@@ -1,36 +1,90 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiBody, ApiQuery } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
 import { HotelScopeGuard } from '../../common/guards/hotel-scope.guard';
+import { CurrentHotel } from '../../common/decorators/current-hotel.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { EmployeeDocumentService } from './employee-documents.service';
 import { CreateEmployeeDocumentDto } from './dto/create-employee-document.dto';
 import { UpdateEmployeeDocumentDto } from './dto/update-employee-document.dto';
+import { mkdirSync } from 'fs';
+import { extname } from 'path';
 
-@Controller('employee-documents')
+@ApiTags('employee-documents')
+@ApiBearerAuth('JWT')
 @UseGuards(HotelScopeGuard)
+@Controller('employee-documents')
 export class EmployeeDocumentController {
   constructor(private readonly service: EmployeeDocumentService) {}
 
   @Post()
-  create(@Body() dto: CreateEmployeeDocumentDto) {
-    return this.service.create(dto);
+  @Roles('super_admin', 'hotel_admin', 'hr_manager')
+  create(@CurrentHotel() hotelId: string, @Body() dto: CreateEmployeeDocumentDto) {
+    return this.service.create(hotelId, dto);
   }
 
   @Get()
-  findAll() {
-    return this.service.findAll();
+  findAll(
+    @CurrentHotel() hotelId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: string,
+  ) {
+    return this.service.findAll(
+      hotelId,
+      page ? parseInt(page, 10) : 1,
+      limit ? parseInt(limit, 10) : 25,
+      sortBy,
+      sortOrder as 'ASC' | 'DESC',
+    );
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.service.findOne(id);
+  findOne(@Param('id') id: string, @CurrentHotel() hotelId: string) {
+    return this.service.findOne(id, hotelId);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateEmployeeDocumentDto) {
-    return this.service.update(id, dto);
+  @Roles('super_admin', 'hotel_admin', 'hr_manager')
+  update(@Param('id') id: string, @CurrentHotel() hotelId: string, @Body() dto: UpdateEmployeeDocumentDto) {
+    return this.service.update(id, hotelId, dto);
+  }
+
+  @Post('upload')
+  @Roles('super_admin', 'hotel_admin', 'hr_manager')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: './uploads',
+        filename: (req, file, cb) => {
+          mkdirSync('./uploads', { recursive: true });
+          const ext = extname(file.originalname);
+          cb(null, `${Date.now()}${ext}`);
+        },
+      }),
+      limits: { fileSize: 10 * 1024 * 1024 },
+      fileFilter: (req, file, cb) => {
+        const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+        cb(null, allowed.includes(file.mimetype));
+      },
+    }),
+  )
+  upload(
+    @CurrentHotel() hotelId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Body('employeeId') employeeId: string,
+    @Body('documentType') documentType: string,
+    @Body('expiryDate') expiryDate?: string,
+  ) {
+    const fileUrl = `/uploads/${file.filename}`;
+    return this.service.create(hotelId, { employeeId, documentType, fileUrl, expiryDate: expiryDate || undefined });
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.service.remove(id);
+  @Roles('super_admin', 'hotel_admin', 'hr_manager')
+  remove(@Param('id') id: string, @CurrentHotel() hotelId: string) {
+    return this.service.remove(id, hotelId);
   }
 }
