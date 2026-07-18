@@ -1,15 +1,13 @@
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiBody, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
+import { memoryStorage } from 'multer';
 import { HotelScopeGuard } from '../../common/guards/hotel-scope.guard';
 import { CurrentHotel } from '../../common/decorators/current-hotel.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { EmployeeDocumentService } from './employee-documents.service';
 import { CreateEmployeeDocumentDto } from './dto/create-employee-document.dto';
 import { UpdateEmployeeDocumentDto } from './dto/update-employee-document.dto';
-import { mkdirSync } from 'fs';
-import { extname } from 'path';
 
 @ApiTags('employee-documents')
 @ApiBearerAuth('JWT')
@@ -56,14 +54,7 @@ export class EmployeeDocumentController {
   @Roles('super_admin', 'hotel_admin', 'hr_manager')
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: './uploads',
-        filename: (req, file, cb) => {
-          mkdirSync('./uploads', { recursive: true });
-          const ext = extname(file.originalname);
-          cb(null, `${Date.now()}${ext}`);
-        },
-      }),
+      storage: memoryStorage(),
       limits: { fileSize: 10 * 1024 * 1024 },
       fileFilter: (req, file, cb) => {
         const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
@@ -78,7 +69,7 @@ export class EmployeeDocumentController {
     @Body('documentType') documentType: string,
     @Body('expiryDate') expiryDate?: string,
   ) {
-    const fileUrl = `/uploads/${file.filename}`;
+    const fileUrl = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
     return this.service.create(hotelId, { employeeId, documentType, fileUrl, expiryDate: expiryDate || undefined });
   }
 
