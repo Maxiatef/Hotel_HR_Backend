@@ -97,14 +97,18 @@ async function configureApp(app: NestExpressApplication) {
   const document = SwaggerModule.createDocument(app, config);
 
   const httpAdapter = app.getHttpAdapter();
-  httpAdapter.get('/api/docs', (_req: any, res: any) => {
+  const sendDocs = (_req: any, res: any) => {
     res.setHeader('Content-Type', 'text/html');
     res.send(SWAGGER_HTML);
-  });
-  httpAdapter.get('/api/docs-json', (_req: any, res: any) => {
+  };
+  const sendJson = (_req: any, res: any) => {
     res.setHeader('Content-Type', 'application/json');
     res.send(JSON.stringify(document));
-  });
+  };
+  httpAdapter.get('/docs', sendDocs);
+  httpAdapter.get('/api/docs', sendDocs);
+  httpAdapter.get('/docs-json', sendJson);
+  httpAdapter.get('/api/docs-json', sendJson);
 }
 
 async function createServer() {

@@ -95,14 +95,18 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
 
   const httpAdapter = app.getHttpAdapter();
-  httpAdapter.get('/api/docs', (_req, res) => {
+  const sendDocs = (_req, res) => {
     res.setHeader('Content-Type', 'text/html');
     res.send(SWAGGER_HTML);
-  });
-  httpAdapter.get('/api/docs-json', (_req, res) => {
+  };
+  const sendJson = (_req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.send(JSON.stringify(document));
-  });
+  };
+  httpAdapter.get('/docs', sendDocs);
+  httpAdapter.get('/api/docs', sendDocs);
+  httpAdapter.get('/docs-json', sendJson);
+  httpAdapter.get('/api/docs-json', sendJson);
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
