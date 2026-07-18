@@ -8,6 +8,33 @@ import { AppModule } from '../src/app.module';
 
 let serverPromise: Promise<express.Express> | undefined;
 
+const SWAGGER_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Hotel HR API Docs</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+  <style>
+    body { margin: 0; padding: 0; }
+    .topbar { display: none; }
+  </style>
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    SwaggerUIBundle({
+      url: '/api/docs-json',
+      dom_id: '#swagger-ui',
+      persistAuthorization: true,
+      docExpansion: 'none',
+      filter: true,
+      tagsSorter: 'alpha',
+    });
+  </script>
+</body>
+</html>`;
+
 async function configureApp(app: NestExpressApplication) {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.use(helmet());
@@ -38,36 +65,35 @@ async function configureApp(app: NestExpressApplication) {
       { type: 'http', scheme: 'bearer', bearerFormat: 'JWT', in: 'header' },
       'JWT',
     )
-    .addTag('auth', '🔐 Authentication — login, register, change password')
-    .addTag('hotels', '🏨 Hotel management')
-    .addTag('users', '👤 User accounts and role management')
-    .addTag('departments', '🏢 Department management')
-    .addTag('employees', '👷 Employee profiles and records')
-    .addTag('employment-assignments', '📋 Employment assignments and hotel transfers')
-    .addTag('salary-history', '💰 Employee salary history')
-    .addTag('bonus-deductions', '➕➖ Bonuses and deductions')
-    .addTag('attendance-records', '📅 Daily attendance tracking')
-    .addTag('leave-requests', '🌴 Leave request management')
-    .addTag('loans', '🏦 Employee loans')
-    .addTag('advances', '💵 Salary advance requests')
-    .addTag('payroll-periods', '📆 Payroll period management')
-    .addTag('payroll-runs', '⚙️ Payroll run processing and calculation')
-    .addTag('payroll-items', '🧾 Payroll calculation line items')
-    .addTag('employee-bank-accounts', '🏧 Employee bank accounts')
-    .addTag('employee-documents', '📄 Employee documents and file uploads')
-    .addTag('geofence-zones', '📍 Geofence zones for attendance clock-in validation')
-    .addTag('health', '✅ Server health checks')
+    .addTag('auth', 'Authentication — login, register')
+    .addTag('hotels', 'Hotel management')
+    .addTag('users', 'User accounts and role management')
+    .addTag('departments', 'Department management')
+    .addTag('employees', 'Employee profiles and records')
+    .addTag('employment-assignments', 'Employment assignments and hotel transfers')
+    .addTag('salary-history', 'Employee salary history')
+    .addTag('bonus-deductions', 'Bonuses and deductions')
+    .addTag('attendance-records', 'Daily attendance tracking')
+    .addTag('leave-requests', 'Leave request management')
+    .addTag('loans', 'Employee loans')
+    .addTag('advances', 'Salary advance requests')
+    .addTag('payroll-periods', 'Payroll period management')
+    .addTag('payroll-runs', 'Payroll run processing and calculation')
+    .addTag('payroll-items', 'Payroll calculation line items')
+    .addTag('employee-bank-accounts', 'Employee bank accounts')
+    .addTag('employee-documents', 'Employee documents and file uploads')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document, {
-    swaggerOptions: {
-      persistAuthorization: true,
-      docExpansion: 'none',
-      filter: true,
-      tagsSorter: 'alpha',
-    },
-    customSiteTitle: 'Hotel HR API Docs',
+
+  const httpAdapter = app.getHttpAdapter();
+  httpAdapter.get('/docs', (_req: any, res: any) => {
+    res.setHeader('Content-Type', 'text/html');
+    res.send(SWAGGER_HTML);
+  });
+  httpAdapter.get('/docs-json', (_req: any, res: any) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.send(JSON.stringify(document));
   });
 }
 
