@@ -97,11 +97,11 @@ async function configureApp(app: NestExpressApplication) {
   const document = SwaggerModule.createDocument(app, config);
 
   const httpAdapter = app.getHttpAdapter();
-  httpAdapter.get('/docs', (_req: any, res: any) => {
+  httpAdapter.get('/api/docs', (_req: any, res: any) => {
     res.setHeader('Content-Type', 'text/html');
     res.send(SWAGGER_HTML);
   });
-  httpAdapter.get('/docs-json', (_req: any, res: any) => {
+  httpAdapter.get('/api/docs-json', (_req: any, res: any) => {
     res.setHeader('Content-Type', 'application/json');
     res.send(JSON.stringify(document));
   });
