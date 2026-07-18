@@ -3,15 +3,19 @@ import { config } from 'dotenv';
 
 config();
 
+const databaseUrl = process.env.DATABASE_URL;
+const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+
 export const typeOrmConfig: DataSourceOptions = {
   type: 'postgres',
-  host: process.env.POSTGRESQL_ADDON_HOST,
-  port: parseInt(process.env.POSTGRESQL_ADDON_PORT ?? '5432', 10),
-  username: process.env.POSTGRESQL_ADDON_USER,
-  password: process.env.POSTGRESQL_ADDON_PASSWORD,
-  database: process.env.POSTGRESQL_ADDON_DB,
+  url: databaseUrl,
+  host: databaseUrl ? undefined : process.env.POSTGRESQL_ADDON_HOST,
+  port: databaseUrl ? undefined : parseInt(process.env.POSTGRESQL_ADDON_PORT ?? '5432', 10),
+  username: databaseUrl ? undefined : process.env.POSTGRESQL_ADDON_USER,
+  password: databaseUrl ? undefined : process.env.POSTGRESQL_ADDON_PASSWORD,
+  database: databaseUrl ? undefined : process.env.POSTGRESQL_ADDON_DB,
   schema: 'public',
-  ssl: { rejectUnauthorized: false },
+  ssl: isProduction ? { rejectUnauthorized: false } : false,
   entities: [__dirname + '/../models/*.entity{.ts,.js}'],
   migrations: [__dirname + '/../migrations/*{.ts,.js}'],
   synchronize: false,
