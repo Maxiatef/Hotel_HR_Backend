@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, Repository } from 'typeorm';
+import { Between, DataSource, EntityManager, Repository } from 'typeorm';
 import { PayrollRun } from '../../models/payroll-run.entity';
 import { PayrollItem } from '../../models/payroll-item.entity';
 import { PayrollPeriod } from '../../models/payroll-period.entity';
@@ -29,6 +29,7 @@ const OVERTIME_MULTIPLIER = 1.5;
 @Injectable()
 export class PayrollCalculationService {
   constructor(
+    private readonly dataSource: DataSource,
     @InjectRepository(PayrollRun)
     private readonly payrollRunRepo: Repository<PayrollRun>,
     @InjectRepository(PayrollItem)
@@ -48,46 +49,40 @@ export class PayrollCalculationService {
   ) {}
 
   async processPayroll(payrollRunId: string, hotelId: string): Promise<PayrollRun> {
+    // Pre-flight checks outside the transaction (read-only, fast)
     const payrollRun = await this.payrollRunRepo.findOne({
       where: { id: payrollRunId, hotelId } as any,
     });
 
-    if (!payrollRun) {
-      throw new BadRequestException('Payroll run not found');
-    }
+    if (!payrollRun) throw new BadRequestException('Payroll run not found');
+    if (payrollRun.status === 'processing') throw new BadRequestException('Payroll run is currently being processed');
+    if (payrollRun.status === 'completed') throw new BadRequestException('Payroll run has already been completed');
+    if (payrollRun.status === 'approved') throw new BadRequestException('Payroll run has been approved and locked — it cannot be re-processed');
 
-    if (payrollRun.status === 'processing') {
-      throw new BadRequestException('Payroll run is currently being processed');
-    }
-    if (payrollRun.status === 'completed') {
-      throw new BadRequestException('Payroll run has already been completed');
-    }
-    if (payrollRun.status === 'approved') {
-      throw new BadRequestException('Payroll run has been approved and locked — it cannot be re-processed');
-    }
-
-    // Check payroll period status - must be 'open' to process
     const payrollPeriod = await this.payrollPeriodRepo.findOne({
       where: { id: payrollRun.payrollPeriodId } as any,
     });
-
-    if (!payrollPeriod) {
-      throw new BadRequestException('Payroll period not found');
-    }
-
+    if (!payrollPeriod) throw new BadRequestException('Payroll period not found');
     if (payrollPeriod.status !== 'open') {
       throw new BadRequestException(
         `Cannot process payroll run for a ${payrollPeriod.status} period. Only open periods can be processed.`,
       );
     }
 
-    // Update status to processing
+    // Mark as processing before entering the transaction so concurrent requests
+    // are rejected by the status check above even if the transaction is slow.
     payrollRun.status = 'processing';
     await this.payrollRunRepo.save(payrollRun);
 
+    // All mutations (loan deductions, advance status changes, payroll items,
+    // run totals) happen inside one transaction. If anything fails, every
+    // change since BEGIN is rolled back automatically — no partial state.
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
     try {
-      // Get all active employees for this hotel
-      const employees = await this.employeeRepo.find({
+      const employees = await queryRunner.manager.find(Employee, {
         where: { hotelId, isActive: true } as any,
       });
 
@@ -96,7 +91,8 @@ export class PayrollCalculationService {
       let totalNet = 0;
 
       for (const employee of employees) {
-        const item = await this.calculateEmployeePayroll(
+        const item = await this.calculateEmployeePayrollTx(
+          queryRunner.manager,
           employee,
           hotelId,
           payrollPeriod,
@@ -107,27 +103,30 @@ export class PayrollCalculationService {
         totalNet += item.netSalary;
       }
 
-      // Delete any stale items from a previous failed run before saving new ones
-      await this.payrollItemRepo.delete({ payrollRunId } as any);
+      // Remove stale items from a previous failed run
+      await queryRunner.manager.delete(PayrollItem, { payrollRunId } as any);
+      await queryRunner.manager.save(PayrollItem, payrollItems);
 
-      // Save all payroll items
-      await this.payrollItemRepo.save(payrollItems);
-
-      // Update payroll run totals
       payrollRun.totalGross = totalGross;
       payrollRun.totalNet = totalNet;
       payrollRun.status = 'completed';
-      await this.payrollRunRepo.save(payrollRun);
+      await queryRunner.manager.save(PayrollRun, payrollRun);
 
+      await queryRunner.commitTransaction();
       return payrollRun;
     } catch (error) {
+      await queryRunner.rollbackTransaction();
+      // Mark run as failed outside the rolled-back transaction
       payrollRun.status = 'failed';
       await this.payrollRunRepo.save(payrollRun);
       throw new BadRequestException(`Payroll calculation failed: ${error.message}`);
+    } finally {
+      await queryRunner.release();
     }
   }
 
-  private async calculateEmployeePayroll(
+  private async calculateEmployeePayrollTx(
+    manager: EntityManager,
     employee: Employee,
     hotelId: string,
     payrollPeriod: PayrollPeriod,
@@ -143,7 +142,7 @@ export class PayrollCalculationService {
     const hourlyRate = Number(employee.hourlyRate) || 0;
 
     // ── 2. Attendance ─────────────────────────────────────────────────────────
-    const attendanceRecords = await this.attendanceRepo.find({
+    const attendanceRecords = await manager.find(AttendanceRecord, {
       where: {
         employeeId: employee.id,
         hotelId,
@@ -167,7 +166,7 @@ export class PayrollCalculationService {
     const overtimeTotal = hourlyRate * totalOvertimeHours * OVERTIME_MULTIPLIER;
 
     // ── 3. Bonuses & deductions ───────────────────────────────────────────────
-    const bonusDeductions = await this.bonusDeductionRepo.find({
+    const bonusDeductions = await manager.find(BonusDeduction, {
       where: {
         employeeId: employee.id,
         hotelId,
@@ -184,7 +183,7 @@ export class PayrollCalculationService {
     }
 
     // ── 4. Loan installments ──────────────────────────────────────────────────
-    const activeLoans = await this.loanRepo.find({
+    const activeLoans = await manager.find(Loan, {
       where: { employeeId: employee.id, hotelId, status: 'active' } as any,
     });
 
@@ -196,11 +195,11 @@ export class PayrollCalculationService {
       loanDeductionTotal += deduction;
       loan.remainingAmount = remaining - deduction;
       if (loan.remainingAmount <= 0) loan.status = 'completed';
-      await this.loanRepo.save(loan);
+      await manager.save(Loan, loan);
     }
 
     // ── 5. Salary advances ────────────────────────────────────────────────────
-    const approvedAdvances = await this.advanceRepo.find({
+    const approvedAdvances = await manager.find(Advance, {
       where: { employeeId: employee.id, hotelId, status: 'approved' } as any,
     });
 
@@ -208,7 +207,7 @@ export class PayrollCalculationService {
     for (const advance of approvedAdvances) {
       advanceDeductionTotal += Number(advance.amount);
       advance.status = 'deducted';
-      await this.advanceRepo.save(advance);
+      await manager.save(Advance, advance);
     }
 
     // ── 6. Social insurance ───────────────────────────────────────────────────
@@ -248,7 +247,7 @@ export class PayrollCalculationService {
       - loanDeductionTotal
       - advanceDeductionTotal;
 
-    return this.payrollItemRepo.create({
+    return manager.create(PayrollItem, {
       payrollRunId,
       employeeId: employee.id,
       hotelId,

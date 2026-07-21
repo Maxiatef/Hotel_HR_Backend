@@ -81,7 +81,10 @@ export class AttendanceRecordService {
       throw new BadRequestException('You are already clocked in');
     }
 
-    // Create a fresh record for this entry cycle
+    // Create a fresh record for this clock-in cycle.
+    // The DB partial unique index (employeeId, workDate) WHERE checkOut IS NULL
+    // enforces at most one open record at a time, so concurrent retries from the
+    // mobile offline queue can't produce duplicates.
     const now = new Date();
     const record = new AttendanceRecord();
     record.employeeId = empId;
@@ -92,16 +95,22 @@ export class AttendanceRecordService {
     record.zoneId = zoneMatch.zoneId;
     record.zoneName = zoneMatch.zoneName;
     record.zoneEnteredAt = now;
-    return this.repo.save(record);
+    try {
+      return await this.repo.save(record);
+    } catch (err: any) {
+      if (err.code === '23505') {
+        throw new BadRequestException('You are already clocked in');
+      }
+      throw err;
+    }
   }
 
   async clockOut(hotelId: string, employeeId: string | undefined, lat: number, lng: number) {
     const empId = this.requireEmployeeId(employeeId);
 
-    const { inside } = await this.geofenceService.isPointInsideAnyZone(hotelId, lat, lng);
-    if (!inside) {
-      throw new BadRequestException('You are not within a valid work location to clock out');
-    }
+    // No zone check on clock-out: the employee is clocking out BECAUSE they left
+    // the zone. Requiring them to be inside would always reject auto clock-outs.
+    // Zone validation only applies to clock-in (prevents fake check-ins from home).
 
     // Find the latest open record for today
     const workDate = todayDateString();

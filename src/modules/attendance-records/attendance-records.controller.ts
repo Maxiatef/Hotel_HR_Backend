@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import { CurrentHotel } from '../../common/decorators/current-hotel.decorator';
 import { CurrentEmployee } from '../../common/decorators/current-employee.decorator';
 import { HotelScopeGuard } from '../../common/guards/hotel-scope.guard';
@@ -19,24 +20,30 @@ export class AttendanceRecordController {
 
   // Employee self-service (mobile app) — declared before the ':id' route below so
   // 'me'/'me/today'/'clock-in'/'clock-out' aren't swallowed by the :id param route.
+  // @SkipThrottle: these are machine-generated (background service, 30 s poll) so the
+  // global 3 req/s limit would reject legitimate requests from a hotel with many employees.
+  @SkipThrottle()
   @Post('clock-in')
   @ApiOperation({ summary: 'Clock in', description: "Records the caller's own check-in, validated against the hotel's geofence zones" })
   clockIn(@CurrentHotel() hotelId: string, @CurrentEmployee() employeeId: string, @Body() dto: ClockInDto) {
     return this.service.clockIn(hotelId, employeeId, dto.lat, dto.lng);
   }
 
+  @SkipThrottle()
   @Post('clock-out')
   @ApiOperation({ summary: 'Clock out', description: "Records the caller's own check-out and computes hours worked" })
   clockOut(@CurrentHotel() hotelId: string, @CurrentEmployee() employeeId: string, @Body() dto: ClockOutDto) {
     return this.service.clockOut(hotelId, employeeId, dto.lat, dto.lng);
   }
 
+  @SkipThrottle()
   @Get('me/today')
   @ApiOperation({ summary: "Today's attendance for the caller" })
   getMyToday(@CurrentHotel() hotelId: string, @CurrentEmployee() employeeId: string) {
     return this.service.getTodayForEmployee(hotelId, employeeId);
   }
 
+  @SkipThrottle()
   @Get('me')
   @ApiOperation({ summary: "The caller's own attendance history" })
   findMine(

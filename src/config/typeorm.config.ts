@@ -20,6 +20,11 @@ export const typeOrmConfig: DataSourceOptions = {
   migrations: [__dirname + '/../migrations/*{.ts,.js}'],
   synchronize: false,
   logging: false,
+  extra: {
+    max: 10,                    // cap connections to stay within Clever Cloud free tier limits
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
+  },
 };
 
 export default new DataSource(typeOrmConfig);
