@@ -121,13 +121,23 @@ export class AuthService {
   }
 
   async seed(hotelName: string, hotelCode: string, username: string, email: string, password: string) {
+    // Re-check inside a serialized path: read count, then immediately attempt to
+    // insert. If two concurrent seed requests both read count=0, the unique DB
+    // constraint on username/email will reject the second one with a 23505 error,
+    // which we convert to a clean 400.
     const userCount = await this.userRepo.count();
     if (userCount > 0) {
       throw new BadRequestException('Seed is only allowed when no users exist');
     }
 
     const hotel = this.hotelRepo.create({ code: hotelCode, name: hotelName, isActive: true });
-    const savedHotel = await this.hotelRepo.save(hotel);
+    let savedHotel: typeof hotel;
+    try {
+      savedHotel = await this.hotelRepo.save(hotel);
+    } catch (err: any) {
+      if (err.code === '23505') throw new BadRequestException('Seed has already been run');
+      throw err;
+    }
 
     const passwordHash = await bcrypt.hash(password, 10);
     const user = this.userRepo.create({

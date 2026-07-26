@@ -6,6 +6,7 @@ import { RegisterDto } from './dto/register.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { SeedDto } from './dto/seed.dto';
 import { Public } from '../../common/decorators/public.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -21,11 +22,13 @@ export class AuthController {
     return this.authService.login(dto);
   }
 
-  @Public()
   @Post('register')
-  @ApiOperation({ summary: 'Register a new user', description: 'Create a new user account linked to a hotel' })
+  @ApiBearerAuth('JWT')
+  @Roles('super_admin', 'hotel_admin')
+  @ApiOperation({ summary: 'Register a new user', description: 'Create a new user account linked to a hotel. Requires hotel_admin or super_admin role.' })
   @ApiResponse({ status: 201, description: 'User registered successfully — returns JWT token' })
   @ApiResponse({ status: 400, description: 'Validation error or duplicate username/email' })
+  @ApiResponse({ status: 403, description: 'Forbidden — insufficient role' })
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }

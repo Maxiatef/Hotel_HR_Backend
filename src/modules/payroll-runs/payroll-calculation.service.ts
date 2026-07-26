@@ -60,7 +60,7 @@ export class PayrollCalculationService {
     if (payrollRun.status === 'approved') throw new BadRequestException('Payroll run has been approved and locked — it cannot be re-processed');
 
     const payrollPeriod = await this.payrollPeriodRepo.findOne({
-      where: { id: payrollRun.payrollPeriodId } as any,
+      where: { id: payrollRun.payrollPeriodId, hotelId } as any,
     });
     if (!payrollPeriod) throw new BadRequestException('Payroll period not found');
     if (payrollPeriod.status !== 'open') {
@@ -69,19 +69,30 @@ export class PayrollCalculationService {
       );
     }
 
-    // Mark as processing before entering the transaction so concurrent requests
-    // are rejected by the status check above even if the transaction is slow.
-    payrollRun.status = 'processing';
-    await this.payrollRunRepo.save(payrollRun);
-
-    // All mutations (loan deductions, advance status changes, payroll items,
-    // run totals) happen inside one transaction. If anything fails, every
-    // change since BEGIN is rolled back automatically — no partial state.
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
+      // Mark as processing inside the transaction using an optimistic-lock style
+      // UPDATE ... WHERE status != 'processing'. If two concurrent requests both
+      // pass the pre-flight check, only one will win the UPDATE; the other will
+      // find status already changed when it commits and its transaction rolls back.
+      const updateResult = await queryRunner.manager
+        .createQueryBuilder()
+        .update(PayrollRun)
+        .set({ status: 'processing' })
+        .where('id = :id AND status NOT IN (:...blocked)', {
+          id: payrollRunId,
+          blocked: ['processing', 'completed', 'approved'],
+        })
+        .execute();
+
+      if (updateResult.affected === 0) {
+        await queryRunner.rollbackTransaction();
+        throw new BadRequestException('Payroll run is already being processed or has been completed');
+      }
+      payrollRun.status = 'processing';
       const employees = await queryRunner.manager.find(Employee, {
         where: { hotelId, isActive: true } as any,
       });
@@ -199,8 +210,15 @@ export class PayrollCalculationService {
     }
 
     // ── 5. Salary advances ────────────────────────────────────────────────────
+    // Scope to advances approved within this payroll period to avoid deducting
+    // future-period advances early or double-deducting on a re-run.
     const approvedAdvances = await manager.find(Advance, {
-      where: { employeeId: employee.id, hotelId, status: 'approved' } as any,
+      where: {
+        employeeId: employee.id,
+        hotelId,
+        status: 'approved',
+        payrollPeriodId: payrollPeriodId,
+      } as any,
     });
 
     let advanceDeductionTotal = 0;

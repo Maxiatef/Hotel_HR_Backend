@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { safeSortBy } from '../../common/utils/sort.util';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { GeofenceZone } from '../../models/geofence-zone.entity';
@@ -20,7 +21,7 @@ export class GeofenceZoneService {
 
   async findAll(hotelId: string, page = 1, limit = 25, sortBy?: string, sortOrder: 'ASC' | 'DESC' = 'ASC') {
     const skip = (page - 1) * limit;
-    const order = sortBy ? { [sortBy]: sortOrder } : {};
+    const order = safeSortBy(sortBy) ? { [safeSortBy(sortBy)!]: sortOrder } : {};
     const [data, total] = await this.repo.findAndCount({
       where: { hotelId } as any,
       skip,
@@ -54,7 +55,7 @@ export class GeofenceZoneService {
     for (const zone of zones) {
       // Accept the point if it's inside the polygon, or within 150m of the
       // nearest edge, to account for GPS inaccuracy (especially indoors).
-      if (isPointInsideOrNearPolygon({ lat, lng }, zone.points, 150)) {
+      if (isPointInsideOrNearPolygon({ lat, lng }, zone.points, 50)) {
         return { inside: true, zoneId: zone.id, zoneName: zone.name };
       }
     }

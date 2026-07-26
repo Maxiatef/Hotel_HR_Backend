@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Loan } from '../../models/loan.entity';
+import { safeSortBy } from '../../common/utils/sort.util';
 import { CreateLoanDto } from './dto/create-loan.dto';
 import { UpdateLoanDto } from './dto/update-loan.dto';
 
@@ -27,15 +28,12 @@ export class LoanService {
     return this.repo.save(entity);
   }
 
-  async findAll(hotelId: string, page = 1, limit = 25, sortBy?: string, sortOrder: 'ASC' | 'DESC' = 'ASC') {
+  async findAll(hotelId: string, page = 1, limit = 25, sortBy?: string, sortOrder: 'ASC' | 'DESC' = 'ASC', employeeId?: string) {
     const skip = (page - 1) * limit;
-    const order = sortBy ? { [sortBy]: sortOrder } : {};
-    const [data, total] = await this.repo.findAndCount({
-      where: { hotelId } as any,
-      skip,
-      take: limit,
-      order,
-    });
+    const order = safeSortBy(sortBy) ? { [safeSortBy(sortBy)!]: sortOrder } : {};
+    const where: any = { hotelId };
+    if (employeeId) where.employeeId = employeeId;
+    const [data, total] = await this.repo.findAndCount({ where, skip, take: limit, order });
     return { data, total, page, limit };
   }
 

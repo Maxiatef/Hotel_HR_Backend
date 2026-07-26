@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { CurrentHotel } from '../../common/decorators/current-hotel.decorator';
 import { HotelScopeGuard } from '../../common/guards/hotel-scope.guard';
@@ -34,10 +34,15 @@ export class GeofenceZoneController {
     @Query('lat') lat: string,
     @Query('lng') lng: string,
   ) {
+    const parsedLat = parseFloat(lat);
+    const parsedLng = parseFloat(lng);
+    if (isNaN(parsedLat) || isNaN(parsedLng)) {
+      throw new BadRequestException('lat and lng must be valid numbers');
+    }
     const result = await this.service.isPointInsideAnyZone(
       hotelId,
-      parseFloat(lat),
-      parseFloat(lng),
+      parsedLat,
+      parsedLng,
     );
     // Flat shape: mobile clients read `isInZone` as a plain boolean.
     return {

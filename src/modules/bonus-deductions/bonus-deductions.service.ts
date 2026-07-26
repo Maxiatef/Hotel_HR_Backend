@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BonusDeduction } from '../../models/bonus-deduction.entity';
+import { safeSortBy } from '../../common/utils/sort.util';
 import { CreateBonusDeductionDto } from './dto/create-bonus-deduction.dto';
 import { UpdateBonusDeductionDto } from './dto/update-bonus-deduction.dto';
 
@@ -17,15 +18,12 @@ export class BonusDeductionService {
     return this.repo.save(entity);
   }
 
-  async findAll(hotelId: string, page = 1, limit = 25, sortBy?: string, sortOrder: 'ASC' | 'DESC' = 'ASC') {
+  async findAll(hotelId: string, page = 1, limit = 25, sortBy?: string, sortOrder: 'ASC' | 'DESC' = 'ASC', employeeId?: string) {
     const skip = (page - 1) * limit;
-    const order = sortBy ? { [sortBy]: sortOrder } : {};
-    const [data, total] = await this.repo.findAndCount({
-      where: { hotelId } as any,
-      skip,
-      take: limit,
-      order,
-    });
+    const order = safeSortBy(sortBy) ? { [safeSortBy(sortBy)!]: sortOrder } : {};
+    const where: any = { hotelId };
+    if (employeeId) where.employeeId = employeeId;
+    const [data, total] = await this.repo.findAndCount({ where, skip, take: limit, order });
     return { data, total, page, limit };
   }
 

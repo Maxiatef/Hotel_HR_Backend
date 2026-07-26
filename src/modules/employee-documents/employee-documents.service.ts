@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EmployeeDocument } from '../../models/employee-document.entity';
+import { safeSortBy } from '../../common/utils/sort.util';
 import { CreateEmployeeDocumentDto } from './dto/create-employee-document.dto';
 import { UpdateEmployeeDocumentDto } from './dto/update-employee-document.dto';
 
@@ -17,15 +18,12 @@ export class EmployeeDocumentService {
     return this.repo.save(entity);
   }
 
-  async findAll(hotelId: string, page = 1, limit = 25, sortBy?: string, sortOrder: 'ASC' | 'DESC' = 'ASC') {
+  async findAll(hotelId: string, page = 1, limit = 25, sortBy?: string, sortOrder: 'ASC' | 'DESC' = 'ASC', employeeId?: string) {
     const skip = (page - 1) * limit;
-    const order = sortBy ? { [sortBy]: sortOrder } : {};
-    const [data, total] = await this.repo.findAndCount({
-      where: { hotelId } as any,
-      skip,
-      take: limit,
-      order,
-    });
+    const order = safeSortBy(sortBy) ? { [safeSortBy(sortBy)!]: sortOrder } : {};
+    const where: any = { hotelId };
+    if (employeeId) where.employeeId = employeeId;
+    const [data, total] = await this.repo.findAndCount({ where, skip, take: limit, order });
     return { data, total, page, limit };
   }
 

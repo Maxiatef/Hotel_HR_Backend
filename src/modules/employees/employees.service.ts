@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Employee } from '../../models/employee.entity';
 import { Hotel } from '../../models/hotel.entity';
+import { safeSortBy } from '../../common/utils/sort.util';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
 
@@ -44,7 +45,7 @@ export class EmployeeService {
 
   async findAll(hotelId: string, page = 1, limit = 25, sortBy?: string, sortOrder: 'ASC' | 'DESC' = 'ASC') {
     const skip = (page - 1) * limit;
-    const order = sortBy ? { [sortBy]: sortOrder } : {};
+    const order = safeSortBy(sortBy) ? { [safeSortBy(sortBy)!]: sortOrder } : {};
     const [data, total] = await this.repo.findAndCount({
       where: { hotelId } as any,
       skip,

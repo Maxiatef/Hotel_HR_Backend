@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { safeSortBy } from '../../common/utils/sort.util';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AttendanceRecord } from '../../models/attendance-record.entity';
@@ -9,7 +10,11 @@ import { GeofenceZoneService } from '../geofence-zones/geofence-zones.service';
 const REGULAR_HOURS_PER_DAY = 8;
 
 function todayDateString(): string {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 @Injectable()
@@ -25,15 +30,12 @@ export class AttendanceRecordService {
     return this.repo.save(entity);
   }
 
-  async findAll(hotelId: string, page = 1, limit = 25, sortBy?: string, sortOrder: 'ASC' | 'DESC' = 'ASC') {
+  async findAll(hotelId: string, page = 1, limit = 25, sortBy?: string, sortOrder: 'ASC' | 'DESC' = 'ASC', employeeId?: string) {
     const skip = (page - 1) * limit;
-    const order = sortBy ? { [sortBy]: sortOrder } : {};
-    const [data, total] = await this.repo.findAndCount({
-      where: { hotelId } as any,
-      skip,
-      take: limit,
-      order,
-    });
+    const order = safeSortBy(sortBy) ? { [safeSortBy(sortBy)!]: sortOrder } : {};
+    const where: any = { hotelId };
+    if (employeeId) where.employeeId = employeeId;
+    const [data, total] = await this.repo.findAndCount({ where, skip, take: limit, order });
     return { data, total, page, limit };
   }
 
@@ -112,10 +114,10 @@ export class AttendanceRecordService {
     // the zone. Requiring them to be inside would always reject auto clock-outs.
     // Zone validation only applies to clock-in (prevents fake check-ins from home).
 
-    // Find the latest open record for today
-    const workDate = todayDateString();
+    // Look for an open record (checkOut IS NULL). Do NOT filter by workDate so that
+    // a shift that started yesterday and ends today is correctly closed out.
     const record = await this.repo.findOne({
-      where: { employeeId: empId, hotelId, workDate } as any,
+      where: { employeeId: empId, hotelId, checkOut: null } as any,
       order: { checkIn: 'DESC' } as any,
     });
 

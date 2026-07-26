@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { PayrollItem } from '../../models/payroll-item.entity';
+import { safeSortBy } from '../../common/utils/sort.util';
 import { PayrollRun } from '../../models/payroll-run.entity';
 import { PayrollPeriod } from '../../models/payroll-period.entity';
 import { CreatePayrollItemDto } from './dto/create-payroll-item.dto';
@@ -25,7 +26,7 @@ export class PayrollItemService {
 
   async findAll(hotelId: string, page = 1, limit = 25, sortBy?: string, sortOrder: 'ASC' | 'DESC' = 'ASC', payrollRunId?: string) {
     const skip = (page - 1) * limit;
-    const order = sortBy ? { [sortBy]: sortOrder } : {};
+    const order = safeSortBy(sortBy) ? { [safeSortBy(sortBy)!]: sortOrder } : {};
     const where: any = { hotelId };
     if (payrollRunId) where.payrollRunId = payrollRunId;
     const [data, total] = await this.repo.findAndCount({

@@ -29,6 +29,7 @@ export class EmployeeDocumentController {
     @Query('limit') limit?: string,
     @Query('sortBy') sortBy?: string,
     @Query('sortOrder') sortOrder?: string,
+    @Query('employeeId') employeeId?: string,
   ) {
     return this.service.findAll(
       hotelId,
@@ -36,6 +37,7 @@ export class EmployeeDocumentController {
       limit ? parseInt(limit, 10) : 25,
       sortBy,
       sortOrder as 'ASC' | 'DESC',
+      employeeId,
     );
   }
 

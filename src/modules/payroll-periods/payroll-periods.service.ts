@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { safeSortBy } from '../../common/utils/sort.util';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PayrollPeriod } from '../../models/payroll-period.entity';
@@ -36,7 +37,7 @@ export class PayrollPeriodService {
 
   async findAll(hotelId: string, page = 1, limit = 25, sortBy?: string, sortOrder: 'ASC' | 'DESC' = 'ASC') {
     const skip = (page - 1) * limit;
-    const order = sortBy ? { [sortBy]: sortOrder } : {};
+    const order = safeSortBy(sortBy) ? { [safeSortBy(sortBy)!]: sortOrder } : {};
     const [data, total] = await this.repo.findAndCount({
       where: { hotelId } as any,
       skip,
@@ -113,6 +114,12 @@ export class PayrollPeriodService {
 
     if (record.status === 'closed') {
       throw new BadRequestException('Cannot delete a closed payroll period');
+    }
+    if (record.status === 'open') {
+      throw new BadRequestException('Cannot delete an open payroll period — close it first');
+    }
+    if (record.status === 'locked') {
+      throw new BadRequestException('Cannot delete a locked payroll period');
     }
 
     // Cascade: delete all items then runs linked to this period
