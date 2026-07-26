@@ -21,8 +21,11 @@ export const typeOrmConfig: DataSourceOptions = {
   synchronize: false,
   logging: false,
   extra: {
-    max: 10,                    // cap connections to stay within Clever Cloud free tier limits
-    idleTimeoutMillis: 30000,
+    // Serverless: every function instance opens its own pool, and many instances
+    // can run concurrently, so keep each pool tiny or the DB's per-role connection
+    // limit gets exhausted (Vercel logs: "too many connections for role ...").
+    max: isProduction ? 1 : 10,
+    idleTimeoutMillis: 10000,
     connectionTimeoutMillis: 5000,
   },
 };

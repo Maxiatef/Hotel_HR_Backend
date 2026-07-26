@@ -122,7 +122,18 @@ async function createServer() {
 
 export default async function handler(request: unknown, response: unknown) {
   serverPromise ??= createServer();
-  const server = await serverPromise;
 
-  return server(request as never, response as never);
+  try {
+    const server = await serverPromise;
+    return server(request as never, response as never);
+  } catch (err) {
+    // Reset so the next invocation retries instead of reusing a rejected promise.
+    serverPromise = undefined;
+    console.error('Server failed to initialize:', err);
+    const res = response as { status: (code: number) => { json: (body: unknown) => void } };
+    res.status(503).json({
+      statusCode: 503,
+      message: 'Service temporarily unavailable (database connection failed).',
+    });
+  }
 }

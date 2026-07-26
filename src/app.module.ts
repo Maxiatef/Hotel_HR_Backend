@@ -29,7 +29,13 @@ import { GeofenceZoneModule } from './modules/geofence-zones/geofence-zones.modu
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    TypeOrmModule.forRoot(typeOrmConfig),
+    TypeOrmModule.forRoot({
+      ...typeOrmConfig,
+      // Fail fast instead of retrying for ~30s and crashing the serverless
+      // function's process when the DB is unreachable or out of connections.
+      retryAttempts: 2,
+      retryDelay: 1000,
+    }),
     ThrottlerModule.forRoot([
       {
         name: 'short',
