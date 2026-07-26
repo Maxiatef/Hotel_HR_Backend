@@ -8,6 +8,17 @@ import { AppModule } from '../src/app.module';
 
 let serverPromise: Promise<express.Express> | undefined;
 
+// node-postgres pools emit 'error' on idle-client failures (e.g. the DB
+// terminating a connection under connection pressure). An unhandled 'error'
+// event crashes the whole Node process regardless of surrounding try/catch,
+// which is what turns a transient DB hiccup into FUNCTION_INVOCATION_FAILED.
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection (kept process alive):', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception (kept process alive):', err);
+});
+
 const SWAGGER_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
